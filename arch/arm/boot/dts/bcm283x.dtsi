@@ -173,6 +173,16 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
+			
+			pitouchscreen_bridge: bridge@45 {
+				compatible = "raspberrypi,touchscreen-bridge-i2c";
+				reg = <0x45>;
+			};
+			
+			pitouchscreen_touch: bridge@38 {
+				compatible = "raspberrypi,touchscreen-ts-i2c";
+				reg = <0x38>;
+			};
 		};
 
 		pixelvalve@7e206000 {
@@ -245,6 +255,39 @@
 			reg = <0x7e400000 0x6000>;
 			interrupts = <2 1>;
 		};
+		
+		dsi1: dsi@7e700000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			#clock-cells = <1>;
+
+			compatible = "brcm,bcm2835-dsi1";
+			reg = <0x7e700000 0x8c>;
+			interrupts = <2 12>;
+
+			clocks = <&clocks BCM2835_PLLD_DSI1>,
+				 <&clocks BCM2835_CLOCK_DSI1E>,
+				 <&clocks BCM2835_CLOCK_DSI1P>;
+			clock-names = "phy", "escape", "pixel";
+			clock-output-names = "dsi1_byte", "dsi1_ddr2", "dsi1_ddr";
+
+			brcm,panel = <&pitouchscreen>;
+
+			pitouchscreen: panel {
+				compatible = "raspberrypi,touchscreen";
+				reg = <0>;
+
+				raspberrypi,touchscreen-bridge = <&pitouchscreen_bridge>;
+			};
+		};
+
+/*
+		dsi0: dsi@7e209000 {
+			compatible = "brcm,bcm2835-dsi0";
+			reg = <0x7e209000 0x78>;
+			interrupts = <2 4>;
+		};
+*/
 
 		i2c1: i2c@7e804000 {
 			compatible = "brcm,bcm2835-i2c";
