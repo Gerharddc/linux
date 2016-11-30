@@ -98,7 +98,7 @@
 };
 
 &fb {
-	status = "okay";
+	status = "disabled";
 };
 
 &uart0 {
@@ -203,5 +203,11 @@
 		sd_force_pio = <&sdhost>,"brcm,force-pio?";
 		sd_pio_limit = <&sdhost>,"brcm,pio-limit:0";
 		sd_debug     = <&sdhost>,"brcm,debug";
+		
+		cma-256 = <0>,"+0-1-2-3-4";
+		cma-192 = <0>,"-0+1-2-3-4";
+		cma-128 = <0>,"-0-1+2-3-4";
+		cma-96  = <0>,"-0-1-2+3-4";
+        cma-64 = <0>,"-0-1-2-3+4";
 	};
 };

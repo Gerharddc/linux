@@ -18,6 +18,10 @@
 			#interrupt-cells = <1>;
 			interrupt-parent = <&local_intc>;
 		};
+        
+        dma {
+            brcm,dma-channel-mask = <0x7f35>;
+        };
 
 		arm-pmu {
 #ifdef RPI364

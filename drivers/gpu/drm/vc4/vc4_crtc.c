@@ -162,6 +162,9 @@ int vc4_crtc_get_scanoutpos(struct drm_device *dev, unsigned int crtc_id,
 	int fifo_lines;
 	int vblank_lines;
 	int ret = 0;
+    
+    if (vc4->firmware_kms)
+        return 0;
 
 	/*
 	 * XXX Doesn't work well in interlaced mode yet, partially due
@@ -622,6 +625,9 @@ int vc4_enable_vblank(struct drm_device *dev, unsigned int crtc_id)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct vc4_crtc *vc4_crtc = vc4->crtc[crtc_id];
+    
+    if (vc4->firmware_kms)
+        return 0;
 
 	CRTC_WRITE(PV_INTEN, PV_INT_VFP_START);
 
@@ -632,6 +638,9 @@ void vc4_disable_vblank(struct drm_device *dev, unsigned int crtc_id)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct vc4_crtc *vc4_crtc = vc4->crtc[crtc_id];
+    
+    if (vc4->firmware_kms)
+        return;
 
 	CRTC_WRITE(PV_INTEN, 0);
 }
