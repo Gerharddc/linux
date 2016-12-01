@@ -122,7 +122,7 @@
 			compatible = "brcm,bcm2835-dsi1";
 			reg = <0x7e700000 0x8c>;
 			interrupts = <2 12>;
-
+            
 			clocks = <&cprman BCM2835_PLLD_DSI1>,
                      <&cprman BCM2835_CLOCK_DSI1E>,
                      <&cprman BCM2835_CLOCK_DSI1P>;

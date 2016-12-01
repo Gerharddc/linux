@@ -174,7 +174,7 @@
 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
 };
 
-&dsi {
+&dsi1 {
     #address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
