@@ -8,6 +8,12 @@
 
 / {
 	model = "Raspberry Pi 3 Model B";
+	
+	rpi_ft5406: rpi_ft5406 {
+        compatible = "rpi,rpi-ft5406";
+		firmware = <&firmware>;
+		status = "okay";
+    };
 };
 
 &gpio {
@@ -166,6 +172,19 @@
 
 &hdmi {
 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+};
+
+&dsi {
+    #address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	brcm,panel = <&pitouchscreen>;
+
+	pitouchscreen: panel {
+		compatible = "raspberrypi,touchscreen";
+		reg = <0>;
+    };
 };
 
 &audio {

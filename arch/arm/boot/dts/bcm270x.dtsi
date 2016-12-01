@@ -3,7 +3,7 @@
 
 / {
 	chosen {
-		bootargs = "cma=256M@256M";
+		bootargs = "";
 	};
 
 	soc: soc {
@@ -113,6 +113,24 @@
 			dma-names = "rx-tx";
 			status = "disabled";
 		};
+        
+        dsi1: dsi@7e700000 {
+            #address-cells = <1>;
+			#size-cells = <0>;
+			#clock-cells = <1>;
+
+			compatible = "brcm,bcm2835-dsi1";
+			reg = <0x7e700000 0x8c>;
+			interrupts = <2 12>;
+
+			clocks = <&cprman BCM2835_PLLD_DSI1>,
+                     <&cprman BCM2835_CLOCK_DSI1E>,
+                     <&cprman BCM2835_CLOCK_DSI1P>;
+			clock-names = "phy", "escape", "pixel";
+			clock-output-names = "dsi1_byte", "dsi1_ddr2", "dsi1_ddr";
+			status = "disabled";
+			power-domains = <&power RPI_POWER_DOMAIN_DSI1>;
+        };
 
 		i2c@7e804000 {  /* i2c1 */
 			compatible = "brcm,bcm2708-i2c";
