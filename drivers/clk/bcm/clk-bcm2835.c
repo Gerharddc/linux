@@ -313,7 +313,7 @@ struct bcm2835_cprman {
 	struct device *dev;
 	void __iomem *regs;
 	spinlock_t regs_lock; /* spinlock for all clocks */
-	
+
 	/*
 	 * Real names of cprman clock parents looked up through
 	 * of_clk_get_parent_name(), which will be used in the
@@ -918,8 +918,8 @@ static long bcm2835_clock_rate_from_divisor(struct bcm2835_clock *clock,
 {
 	const struct bcm2835_clock_data *data = clock->data;
 	u64 temp;
-    
-    if (data->int_bits == 0 && data->frac_bits == 0)
+
+	if (data->int_bits == 0 && data->frac_bits == 0)
 		return parent_rate;
 
 	/*
@@ -951,7 +951,7 @@ static unsigned long bcm2835_clock_get_rate(struct clk_hw *hw,
 		return parent_rate;
 
 	div = cprman_read(cprman, data->div_reg);
-    
+
 	return bcm2835_clock_rate_from_divisor(clock, parent_rate, div);
 }
 
@@ -1395,6 +1395,10 @@ static const char *const bcm2835_clock_vpu_parents[] = {
 	.parents = bcm2835_clock_vpu_parents,				\
 	__VA_ARGS__)
 
+/*
+ * DSI1 parent clocks.  The DSI1 byte clock comes from the DSI1 PHY,
+ * which in turn sources from plld_dsi1.
+ */
 static const char *const bcm2835_clock_dsi1_parents[] = {
 	"gnd",
 	"xosc",
@@ -1411,8 +1415,7 @@ static const char *const bcm2835_clock_dsi1_parents[] = {
 #define REGISTER_DSI1_CLK(...)	REGISTER_CLK(				\
 	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_dsi1_parents),	\
 	.parents = bcm2835_clock_dsi1_parents,				\
-__VA_ARGS__)
-
+	__VA_ARGS__)
 
 /*
  * the real definition of all the pll, pll_dividers and clocks
@@ -1859,12 +1862,12 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
 		.div_reg = CM_DSI1EDIV,
 		.int_bits = 4,
 		.frac_bits = 8),
-    [BCM2835_CLOCK_DSI1P]	= REGISTER_DSI1_CLK(
+	[BCM2835_CLOCK_DSI1P]	= REGISTER_DSI1_CLK(
 		.name = "dsi1p",
 		.ctl_reg = CM_DSI1PCTL,
 		.div_reg = CM_DSI1PDIV,
 		.int_bits = 0,
-        .frac_bits = 0),
+		.frac_bits = 0),
 	/* the gates */
 
 	/*
