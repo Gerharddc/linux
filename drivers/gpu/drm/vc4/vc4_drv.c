@@ -9,6 +9,7 @@
 
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -42,6 +43,18 @@ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
 	}
 
 	return map;
+}
+
+void vc4_dump_regs32(const struct debugfs_reg32 *regs, unsigned int num_regs,
+		     void __iomem *base, const char *prefix)
+{
+	unsigned int i;
+
+	for (i = 0; i < num_regs; i++) {
+		DRM_INFO("%s0x%04lx (%s): 0x%08x\n",
+			 prefix, regs[i].offset, regs[i].name,
+			 readl(base + regs[i].offset));
+	}
 }
 
 static int vc4_get_param_ioctl(struct drm_device *dev, void *data,
@@ -289,6 +302,7 @@ static const struct component_master_ops vc4_drm_ops = {
 static struct platform_driver *const component_drivers[] = {
 	&vc4_hdmi_driver,
 	&vc4_dpi_driver,
+    &vc4_dsi_driver,
 	&vc4_hvs_driver,
 	&vc4_crtc_driver,
     &vc4_firmware_kms_driver,
