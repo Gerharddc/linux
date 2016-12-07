@@ -370,10 +370,10 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	struct drm_crtc_state *state = crtc->state;
 	struct drm_display_mode *mode = &state->adjusted_mode;
 	bool interlace = mode->flags & DRM_MODE_FLAG_INTERLACE;
-	u32 pixel_rep = (mode->flags & DRM_MODE_FLAG_DBLCLK) ? 2 : 1;
 	bool is_dsi = (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
 		       vc4_encoder->type == VC4_ENCODER_TYPE_DSI1);
 	u32 format = is_dsi ? PV_CONTROL_FORMAT_DSIV_24 : PV_CONTROL_FORMAT_24;
+	u32 pixel_rep = (mode->flags & DRM_MODE_FLAG_DBLCLK) ? 2 : 1;
 	bool debug_dump_regs = false;
 
 	if (debug_dump_regs) {
@@ -430,20 +430,18 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
 		 */
 		CRTC_WRITE(PV_V_CONTROL,
 			   PV_VCONTROL_CONTINUOUS |
+			   (is_dsi ? PV_VCONTROL_DSI : 0) |
 			   PV_VCONTROL_INTERLACE |
 			   VC4_SET_FIELD(mode->htotal * pixel_rep / 2,
 					 PV_VCONTROL_ODD_DELAY));
 		CRTC_WRITE(PV_VSYNCD_EVEN, 0);
 	} else {
-		CRTC_WRITE(PV_V_CONTROL, PV_VCONTROL_CONTINUOUS);
+		CRTC_WRITE(PV_V_CONTROL,
+			   PV_VCONTROL_CONTINUOUS |
+			   (is_dsi ? PV_VCONTROL_DSI : 0));
 	}
 
 	CRTC_WRITE(PV_HACT_ACT, mode->hdisplay * pixel_rep);
-
-	CRTC_WRITE(PV_V_CONTROL,
-		   PV_VCONTROL_CONTINUOUS |
-		   (is_dsi ? PV_VCONTROL_DSI : 0) |
-		   (interlace ? PV_VCONTROL_INTERLACE : 0));
 
 	CRTC_WRITE(PV_CONTROL,
 		   VC4_SET_FIELD(format, PV_CONTROL_FORMAT) |
@@ -881,6 +879,26 @@ static const struct drm_crtc_helper_funcs vc4_crtc_helper_funcs = {
 	.atomic_check = vc4_crtc_atomic_check,
 	.atomic_flush = vc4_crtc_atomic_flush,
 };
+
+/* Frees the page flip event when the DRM device is closed with the
+ * event still outstanding.
+ */
+void vc4_cancel_page_flip(struct drm_crtc *crtc, struct drm_file *file)
+{
+	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
+	struct drm_device *dev = crtc->dev;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->event_lock, flags);
+
+	if (vc4_crtc->event && vc4_crtc->event->base.file_priv == file) {
+		kfree(&vc4_crtc->event->base);
+		drm_crtc_vblank_put(crtc);
+		vc4_crtc->event = NULL;
+	}
+
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+}
 
 static const struct vc4_crtc_data pv0_data = {
 	.hvs_channel = 2,

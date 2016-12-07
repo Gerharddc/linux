@@ -335,15 +335,18 @@ struct vc4_exec_info {
 static inline struct vc4_exec_info *
 vc4_first_bin_job(struct vc4_dev *vc4)
 {
-	return list_first_entry_or_null(&vc4->bin_job_list,
-					struct vc4_exec_info, head);
+	if (list_empty(&vc4->bin_job_list))
+		return NULL;
+	return list_first_entry(&vc4->bin_job_list, struct vc4_exec_info, head);
 }
 
 static inline struct vc4_exec_info *
 vc4_first_render_job(struct vc4_dev *vc4)
 {
-	return list_first_entry_or_null(&vc4->render_job_list,
-					struct vc4_exec_info, head);
+	if (list_empty(&vc4->render_job_list))
+		return NULL;
+	return list_first_entry(&vc4->render_job_list,
+				struct vc4_exec_info, head);
 }
 
 static inline struct vc4_exec_info *
@@ -392,6 +395,8 @@ struct vc4_validated_shader_info {
 
 	uint32_t num_uniform_addr_offsets;
 	uint32_t *uniform_addr_offsets;
+
+	bool is_threaded;
 };
 
 /**
@@ -451,6 +456,7 @@ int vc4_bo_stats_debugfs(struct seq_file *m, void *arg);
 extern struct platform_driver vc4_crtc_driver;
 int vc4_enable_vblank(struct drm_device *dev, unsigned int crtc_id);
 void vc4_disable_vblank(struct drm_device *dev, unsigned int crtc_id);
+void vc4_cancel_page_flip(struct drm_crtc *crtc, struct drm_file *file);
 int vc4_crtc_debugfs_regs(struct seq_file *m, void *arg);
 int vc4_crtc_get_scanoutpos(struct drm_device *dev, unsigned int crtc_id,
 			    unsigned int flags, int *vpos, int *hpos,
@@ -499,6 +505,7 @@ void vc4_job_handle_completed(struct vc4_dev *vc4);
 int vc4_queue_seqno_cb(struct drm_device *dev,
 		       struct vc4_seqno_cb *cb, uint64_t seqno,
 		       void (*func)(struct vc4_seqno_cb *cb));
+int vc4_gem_exec_debugfs(struct seq_file *m, void *arg);
 
 /* vc4_hdmi.c */
 extern struct platform_driver vc4_hdmi_driver;

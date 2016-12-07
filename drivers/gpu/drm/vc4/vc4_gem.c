@@ -32,6 +32,20 @@
 #include "vc4_regs.h"
 #include "vc4_trace.h"
 
+#ifdef CONFIG_DEBUG_FS
+int vc4_gem_exec_debugfs(struct seq_file *m, void *unused)
+{
+	struct drm_info_node *node = (struct drm_info_node *)m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+
+	seq_printf(m, "Emitted  seqno:   0x%016llx\n", vc4->emit_seqno);
+	seq_printf(m, "Finished seqno:   0x%016llx\n", vc4->finished_seqno);
+
+	return 0;
+}
+#endif /* CONFIG_DEBUG_FS */
+
 static void
 vc4_queue_hangcheck(struct drm_device *dev)
 {
@@ -544,14 +558,15 @@ vc4_cl_lookup_bos(struct drm_device *dev,
 
 	handles = drm_malloc_ab(exec->bo_count, sizeof(uint32_t));
 	if (!handles) {
+		ret = -ENOMEM;
 		DRM_ERROR("Failed to allocate incoming GEM handles\n");
 		goto fail;
 	}
 
-	ret = copy_from_user(handles,
-			     (void __user *)(uintptr_t)args->bo_handles,
-			     exec->bo_count * sizeof(uint32_t));
-	if (ret) {
+	if (copy_from_user(handles,
+			   (void __user *)(uintptr_t)args->bo_handles,
+			   exec->bo_count * sizeof(uint32_t))) {
+		ret = -EFAULT;
 		DRM_ERROR("Failed to copy in GEM handles\n");
 		goto fail;
 	}
@@ -708,8 +723,10 @@ vc4_complete_exec(struct drm_device *dev, struct vc4_exec_info *exec)
 	}
 
 	mutex_lock(&vc4->power_lock);
-	if (--vc4->power_refcount == 0)
-		pm_runtime_put(&vc4->v3d->pdev->dev);
+	if (--vc4->power_refcount == 0) {
+		pm_runtime_mark_last_busy(&vc4->v3d->pdev->dev);
+		pm_runtime_put_autosuspend(&vc4->v3d->pdev->dev);
+	}
 	mutex_unlock(&vc4->power_lock);
 
 	kfree(exec);

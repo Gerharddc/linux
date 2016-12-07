@@ -17,7 +17,6 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include "drm_fb_cma_helper.h"
-#include <drm/drm_fb_helper.h>
 
 #include "uapi/drm/vc4_drm.h"
 #include "vc4_drv.h"
@@ -46,6 +45,31 @@ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
 	return map;
 }
 
+static void vc4_drm_preclose(struct drm_device *dev, struct drm_file *file)
+{
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct drm_crtc *crtc;
+
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		if (vc4->firmware_kms)
+			vc4_fkms_cancel_page_flip(crtc, file);
+		else
+			vc4_cancel_page_flip(crtc, file);
+	}
+}
+
+void vc4_dump_regs32(const struct debugfs_reg32 *regs, unsigned int num_regs,
+		     void __iomem *base, const char *prefix)
+{
+	unsigned int i;
+
+	for (i = 0; i < num_regs; i++) {
+		DRM_INFO("%s0x%04lx (%s): 0x%08x\n",
+			 prefix, regs[i].offset, regs[i].name,
+			 readl(base + regs[i].offset));
+	}
+}
+
 static int vc4_get_param_ioctl(struct drm_device *dev, void *data,
 			       struct drm_file *file_priv)
 {
@@ -62,21 +86,24 @@ static int vc4_get_param_ioctl(struct drm_device *dev, void *data,
 		if (ret < 0)
 			return ret;
 		args->value = V3D_READ(V3D_IDENT0);
-		pm_runtime_put(&vc4->v3d->pdev->dev);
+		pm_runtime_mark_last_busy(&vc4->v3d->pdev->dev);
+		pm_runtime_put_autosuspend(&vc4->v3d->pdev->dev);
 		break;
 	case DRM_VC4_PARAM_V3D_IDENT1:
 		ret = pm_runtime_get_sync(&vc4->v3d->pdev->dev);
 		if (ret < 0)
 			return ret;
 		args->value = V3D_READ(V3D_IDENT1);
-		pm_runtime_put(&vc4->v3d->pdev->dev);
+		pm_runtime_mark_last_busy(&vc4->v3d->pdev->dev);
+		pm_runtime_put_autosuspend(&vc4->v3d->pdev->dev);
 		break;
 	case DRM_VC4_PARAM_V3D_IDENT2:
 		ret = pm_runtime_get_sync(&vc4->v3d->pdev->dev);
 		if (ret < 0)
 			return ret;
 		args->value = V3D_READ(V3D_IDENT2);
-		pm_runtime_put(&vc4->v3d->pdev->dev);
+		pm_runtime_mark_last_busy(&vc4->v3d->pdev->dev);
+		pm_runtime_put_autosuspend(&vc4->v3d->pdev->dev);
 		break;
 	case DRM_VC4_PARAM_SUPPORTS_BRANCHES:
 		args->value = true;
@@ -89,23 +116,12 @@ static int vc4_get_param_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
-void vc4_dump_regs32(const struct debugfs_reg32 *regs, unsigned int num_regs,
-		     void __iomem *base, const char *prefix)
-{
-	unsigned int i;
-
-	for (i = 0; i < num_regs; i++) {
-		DRM_INFO("%s0x%04lx (%s): 0x%08x\n",
-			 prefix, regs[i].offset, regs[i].name,
-			 readl(base + regs[i].offset));
-	}
-}
-
 static void vc4_lastclose(struct drm_device *dev)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 
-	drm_fbdev_cma_restore_mode(vc4->fbdev);
+	if (vc4->fbdev)
+		drm_fbdev_cma_restore_mode(vc4->fbdev);
 }
 
 static const struct file_operations vc4_drm_fops = {
@@ -142,6 +158,8 @@ static struct drm_driver vc4_drm_driver = {
 			    DRIVER_RENDER |
 			    DRIVER_PRIME),
 	.lastclose = vc4_lastclose,
+	.preclose = vc4_drm_preclose,
+
 	.irq_handler = vc4_irq,
 	.irq_preinstall = vc4_irq_preinstall,
 	.irq_postinstall = vc4_irq_postinstall,
@@ -159,7 +177,7 @@ static struct drm_driver vc4_drm_driver = {
 #endif
 
 	.gem_create_object = vc4_create_object,
-	.gem_free_object_unlocked = vc4_free_object,
+	.gem_free_object = vc4_free_object,
 	.gem_vm_ops = &drm_gem_cma_vm_ops,
 
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
@@ -228,7 +246,7 @@ static void vc4_kick_out_firmware_fb(void)
 	ap->ranges[0].base = 0;
 	ap->ranges[0].size = ~0;
 
-	drm_fb_helper_remove_conflicting_framebuffers(ap, "vc4drmfb", false);
+	remove_conflicting_framebuffers(ap, "vc4drmfb", false);
 	kfree(ap);
 }
 
@@ -236,6 +254,7 @@ static int vc4_drm_bind(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct drm_device *drm;
+	struct drm_connector *connector;
 	struct vc4_dev *vc4;
 	int ret = 0;
 
@@ -246,8 +265,8 @@ static int vc4_drm_bind(struct device *dev)
 		return -ENOMEM;
 
 	drm = drm_dev_alloc(&vc4_drm_driver, dev);
-	if (IS_ERR(drm))
-		return PTR_ERR(drm);
+	if (!drm)
+		return -ENOMEM;
 	platform_set_drvdata(pdev, drm);
 	vc4->dev = drm;
 	drm->dev_private = vc4;
@@ -268,10 +287,22 @@ static int vc4_drm_bind(struct device *dev)
 	if (ret < 0)
 		goto unbind_all;
 
+	/* Connector registration has to occur after DRM device
+	 * registration, because it creates sysfs entries based on the
+	 * DRM device.
+	 */
+	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
+		ret = drm_connector_register(connector);
+		if (ret)
+			goto unregister;
+	}
+
 	vc4_kms_load(drm);
 
 	return 0;
 
+unregister:
+	drm_dev_unregister(drm);
 unbind_all:
 	component_unbind_all(dev, drm);
 gem_destroy:
